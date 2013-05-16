@@ -1,45 +1,94 @@
 #include "MarkerDetector.h"
 
 MarkerDetector::MarkerDetector(Mat &marker)
-    : markerObject(marker)
+    : marker(marker)
 {
     detector  = new SURF(400);
     extractor = new SURF();
     matcher = new FlannBasedMatcher();
-}
 
-void MarkerDetector::trainMatcher()
-{
     // Extract the descriptors of the marker
-    detector->detect(markerObject.marker, markerKeypoints);
-    Mat markerDescriptors;
-    extractor->compute(markerObject.marker, markerKeypoints, markerDescriptors);
+    detector->detect(marker, markerKeypoints);
+    extractor->compute(marker, markerKeypoints, markerDescriptors);
 
-    // To enable multiple marker detection, train the matcher with a vector of marker descriptors
-    matcher->clear();  // Clear any old train data in it
-    vector<Mat> descriptorsVector;
-    descriptorsVector.push_back(markerDescriptors);
-    matcher->add(descriptorsVector);
-    matcher->train();
+    // Find corners of marker
+    findMarkerCorners();
 }
+
+
+void MarkerDetector::findMarkerCorners()
+{
+    cout << "\nFinding corners of marker..." << endl;
+    const float width = (float)marker.cols;
+    const float height = (float)marker.rows;
+
+    // Alloacte memory to store the points
+    markerCorners_2D.resize(4);
+    markerCorners_3D.resize(4);
+
+    // Find the 2D corners of marker
+    markerCorners_2D[0] = Point2f(0, 0);
+    markerCorners_2D[1] = Point2f(width, 0);
+    markerCorners_2D[2] = Point2f(width, height);
+    markerCorners_2D[3] = Point2f(0, height);
+
+    // Normalized dimensions
+    float maxDim = max(width,height);
+    float NormWidth = width / maxDim;
+    float NormHeight = height / maxDim;
+
+    // Find 3D corners of marker to estimate camera pose later
+    // 3D corners of marker lie on XY plane as its planar, so z coordinate = 0
+    markerCorners_3D[0] = Point3f(-NormWidth, -NormHeight, 0);
+    markerCorners_3D[1] = Point3f( NormWidth, -NormHeight, 0);
+    markerCorners_3D[2] = Point3f( NormWidth,  NormHeight, 0);
+    markerCorners_3D[3] = Point3f(-NormWidth,  NormHeight, 0);
+}
+
+
+
+// Draw an outline around the marker found in the scene
+void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points)
+{
+    cout << "\nDrawing contours around marker in the frame..." << endl;
+      for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
+      {
+        line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
+      }
+    imshow("Marker outline in scene", frame);
+}
+
 
 // Main detection function that performs all steps
-bool MarkerDetector::findMarkerInFrame(Mat& frame, vector<Point2f>& markerCornersInFrame_2D)
+bool MarkerDetector::findMarkerInFrame(Mat& frameColor)
 {
-    // Convert marker to grayscale
-    cvtColor(frame, frame, CV_BGRA2GRAY);
+    cout << "\nFinding marker in current frame..." << endl;
+
+    // Convert frame to grayscale
+    cvtColor(frameColor, frame, CV_BGRA2GRAY);
 
     vector<KeyPoint> frameKeypoints;
     Mat frameDescriptors;
     detector->detect(frame, frameKeypoints);
     extractor->compute(frame, frameKeypoints, frameDescriptors);
 
-    // Find matches between current frame and marker (matcher already trained with marker)
-    matcher->match(frameDescriptors, matches);
+    cout << "\n\tNumber of Keypoints found in marker = " << markerKeypoints.size() << endl;
+    cout << "\n\tNumber of Keypoints found in current frame = " << frameKeypoints.size() << endl;
+
+    // Find matches between current frame and marker
+    matcher->match(markerDescriptors, frameDescriptors, matches);
 
     int minMatchesAllowed = 8;
-    if (matches.size() < minMatchesAllowed)
+    if ((int)matches.size() < minMatchesAllowed)
         return false;
+
+   cout << "\nNumber of matches = " << matches.size() << endl;
+
+    Mat img_matches;
+    drawMatches(marker, markerKeypoints, frame, frameKeypoints,   // objImage, objKeypts, sceneImage, sceneKeypts
+               matches,
+               img_matches,   // drawn output sits here
+               Scalar::all(-1), Scalar::all(-1), vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
 
     // Find the keypoints of the marker and frame that correspond to the best matches
     vector<Point2f> objPoints(matches.size());
@@ -47,41 +96,48 @@ bool MarkerDetector::findMarkerInFrame(Mat& frame, vector<Point2f>& markerCorner
 
     for (size_t i = 0; i < matches.size(); i++)
     {
-        objPoints[i] = markerKeypoints[matches[i].trainIdx].pt;
-        scenePoints[i] = frameKeypoints[matches[i].queryIdx].pt;
+        objPoints[i] = markerKeypoints[matches[i].queryIdx].pt;
+        scenePoints[i] = frameKeypoints[matches[i].trainIdx].pt;
     }
 
+    cout << "\nFinding Homography between marker and frame..." << endl;
     // Find Homography on the best matches
     Mat homography = findHomography(objPoints, scenePoints, CV_RANSAC);
 
+    cout << "\nApplying Perspective Transform..." << endl;
     // Apply the perspective transform obtained from homography to transform
     // the corners of marker image to obtain corners of marker in the frame
-    perspectiveTransform(markerObject.markerCorners_2D, markerCornersInFrame_2D, homography);
+    perspectiveTransform(markerCorners_2D, markerCornersInFrame_2D, homography);
 
-    return matches.size() > minMatchesAllowed;
+    // Draw a contour around the marker found in the current frame
+    drawContour(frameColor, markerCornersInFrame_2D);
+
+    return (int)matches.size() > minMatchesAllowed;
 }
 
 
-
-void MarkerDetector::findMarkerLocation(CameraCalibration calibratedCam, vector<Point2f>& markerCornersInFrame_2D, Mat& pose)
+// Main function that allows tracking information to be passed to OpenGL render function
+void MarkerDetector::estimatePose(CameraCalibration& CameraCalib)
 {
-    Mat rotationVec, translationVec;
-    Mat rotationInverse, translationVecReflected;
+    cout << "\nEstimating Camera Pose..." << endl;
+    Mat rVec, tVec;
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
-    solvePnP(markerObject.markerCorners_3D,
+    solvePnP(markerCorners_3D,
              markerCornersInFrame_2D,
-             calibratedCam.getIntrinsicMatrix(),
-             calibratedCam.getDistortionMatrix(),
-             rotationVec,
-             translationVec);
+             CameraCalib.getIntrinsicMatrix(),
+             CameraCalib.getDistortionMatrix(),
+             rVec,
+             tVec);
 
-    rotationVec.convertTo(rotationVec,CV_32F);
-    translationVec.convertTo(translationVec ,CV_32F);
+    rVec.convertTo(rVec,CV_32F);
+    tVec.convertTo(tVec ,CV_32F);
 
     Mat_<float> rotationMatrix(3,3);
     // Rodrigues converts a rotation vector to rotation matrix and vice-versa
-    Rodrigues(rotationVec, rotationMatrix);
+    Rodrigues(rVec, rotationMatrix);
+
+    Mat rotationInverse, tVecReflected;
 
     // Camera Extrinsic Matrix = [R | t] where R = Rotation Matrix, t = Translation Vector
     // This represents the camera location w.r.t to marker pose.
@@ -91,9 +147,23 @@ void MarkerDetector::findMarkerLocation(CameraCalibration calibratedCam, vector<
     rotationInverse = rotationMatrix.t();
 
     // Find the reflection of translation vector
-    translationVecReflected = -translationVec;
+    tVecReflected = -tVec;
 
+    pose.create(3, 4, CV_32F);
     rotationInverse.copyTo(pose.colRange(Range(0,3)));
-    translationVecReflected.copyTo(pose.col(3));
+    tVecReflected.copyTo(pose.col(3));
+
+    cout << "\nPose matrix = " << pose << endl;
 }
 
+
+const Mat& MarkerDetector::getPose() const
+{
+    return pose;
+}
+
+
+const vector<Point2f>& MarkerDetector::getMarkerCornersInFrame() const
+{
+    return markerCornersInFrame_2D;
+}

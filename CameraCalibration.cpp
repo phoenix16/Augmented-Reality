@@ -3,16 +3,7 @@
 CameraCalibration::CameraCalibration(string InputXMLfile)
     :XMLfile(InputXMLfile)
 {
-}
-
-const Mat& CameraCalibration::getIntrinsicMatrix() const
-{
-    return CameraMatrix;
-}
-
-const Mat& CameraCalibration::getDistortionMatrix() const
-{
-    return DistorsionMatrix;
+    readCameraCalibrated_XMLFile();
 }
 
 void CameraCalibration::readCameraCalibrated_XMLFile()
@@ -25,9 +16,9 @@ void CameraCalibration::readCameraCalibrated_XMLFile()
     fs["image_Width"] >> w;
     fs["image_Height"] >> h;
     fs["Distortion_Coefficients"] >> DistorsionMat;
-    fs["Camera_Matrix"] >> CameraMatrix;
+    fs["Camera_Matrix"] >> IntrinsicMatrix;
 
-    if (CameraMatrix.cols == 0 || CameraMatrix.rows == 0)
+    if (IntrinsicMatrix.cols == 0 || IntrinsicMatrix.rows == 0)
     {
         cout << "Does not contains valid camera matrix" << endl;
     }
@@ -37,7 +28,7 @@ void CameraCalibration::readCameraCalibrated_XMLFile()
     }
 
     // Convert to 32bit float matrix if it is not already
-    CameraMatrix.convertTo(CameraMatrix,CV_32FC1);
+    IntrinsicMatrix.convertTo(IntrinsicMatrix,CV_32FC1);
     DistorsionMat.convertTo(DistorsionMat,CV_32FC1);
 
     if (DistorsionMat.total() < 4)
@@ -51,7 +42,36 @@ void CameraCalibration::readCameraCalibrated_XMLFile()
     for (int i = 0; i < 4; i++)
         DistorsionMatrix.ptr<float>(0)[i] = DistorsionMat.ptr<float>(0)[i];
 
-//    cout << CameraMatrix << endl;
+//    cout << IntrinsicMatrix << endl;
 //    cout << DistorsionMatrix << endl;
+}
 
+const Mat& CameraCalibration::getIntrinsicMatrix() const
+{
+    return IntrinsicMatrix;
+}
+
+const Mat& CameraCalibration::getDistortionMatrix() const
+{
+    return DistorsionMatrix;
+}
+
+const float& CameraCalibration::getfx() const
+{
+	return IntrinsicMatrix.at<float>(0, 0);
+}
+
+const float& CameraCalibration::getfy() const
+{
+    return IntrinsicMatrix.at<float>(1, 1);
+}
+
+const float& CameraCalibration::getcx() const
+{
+    return IntrinsicMatrix.at<float>(0, 2);
+}
+
+const float& CameraCalibration::getcy() const
+{
+    return IntrinsicMatrix.at<float>(1, 2);
 }

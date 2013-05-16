@@ -1,30 +1,30 @@
 #include "AugReality.h"
 
+
 //#define DEBUG_MSGES
 //#define DEBUG_IMAGES
 
-using namespace cv;
-using namespace std;
-
 int main(int argc, char* argv[])
 {
-    Mat marker = imread("mine.jpg", CV_LOAD_IMAGE_GRAYSCALE ); // marker image
+    if(argc != 3 )
+    {
+        cout << "Usage: ./AR [marker image] [Camera Calibration XML file]\n" << endl;
+        return 0;
+    }
 
+    // Load marker image in grayscale
+    Mat marker = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE );
     if( !marker.data)
     { cout<< "Error reading marker image! " << endl; return -1; }
 
-    string in = string(argv[1]);
-    CameraCalibration CameraCalib(in);
+    string XMLfile = string(argv[2]);
+    CameraCalibration CameraCalib(XMLfile);
+
     // Create an object of class AugReality that encompasses the entire pipeline
-
     AugReality AR(marker, CameraCalib);
-
-    // Extract features from stored marker and ready it for AR
-    AR.processMarker();
 
     Mat frame;
     VideoCapture capture(0);
-
     if (!capture.isOpened())
     {
         cout << "Null Capture from Camera!\n";
@@ -57,8 +57,4 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
-
-
-
 
