@@ -1,8 +1,6 @@
-#include "AugReality.h"
-
+#include "AR.h"
 
 //#define DEBUG_MSGES
-//#define DEBUG_IMAGES
 
 int main(int argc, char* argv[])
 {
@@ -15,19 +13,23 @@ int main(int argc, char* argv[])
     // Load marker image in grayscale
     Mat marker = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE );
     if( !marker.data)
-    { cout<< "Error reading marker image! " << endl; return -1; }
+    { cerr << "Error reading marker image! " << endl; return -1; }
 
     string XMLfile = string(argv[2]);
-    CameraCalibration CameraCalib(XMLfile);
+    CameraCalibration cameraCalib(XMLfile);
+	
+	// Set window size = Camera resolution
+	cv::Size windowSize;
+	windowSize.width = 840;
+	windowSize.height = 480;
 
-    // Create an object of class AugReality that encompasses the entire pipeline
-    AugReality AR(marker, CameraCalib);
+    AR ARobj(marker, "Augmented Reality", windowSize, cameraCalib);
 
     Mat frame;
     VideoCapture capture(0);
     if (!capture.isOpened())
     {
-        cout << "Null Capture from Camera!\n";
+        cout << "Null Capture from Camera!" << endl;
         return 0;
     }
 
@@ -36,12 +38,7 @@ int main(int argc, char* argv[])
         capture >> frame;
         if (!frame.empty())
         {
-            // Extract features from current frame to perform AR
-            AR.processFrame(frame);
-
-            // Render the chosen 3D object on the current frame's detected marker
-            AR.render3DObject(frame);
-
+            ARobj.augmentReality(frame);
         }
         else
         {
@@ -49,12 +46,11 @@ int main(int argc, char* argv[])
             break;
         }
 
-        if (cvWaitKey(10) == 27)  // ESC to exit
+        if (waitKey(10) == 27)  // ESC to exit
             break;
     }
 
     waitKey(0);
-
     return 0;
 }
 

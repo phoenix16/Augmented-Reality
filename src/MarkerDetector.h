@@ -26,19 +26,16 @@ private:
 
     vector<Point2f> markerCorners_2D;
     vector<Point3f> markerCorners_3D;
-
-    Mat pose;
 	vector<Point2f> markerCornersInFrame_2D;
+	Mat pose;
 
 public:
     MarkerDetector(Mat &marker);
     void findMarkerCorners();
     void drawContour(Mat &frame, vector<Point2f>& points);
-    bool findMarkerInFrame(Mat& frameColor);
+    bool findMarkerInFrame(Mat& colorFrame);
     void estimatePose(CameraCalibration& calibratedCam);
-	
 	const Mat& getPose() const;
-	const vector<Point2f>& getMarkerCornersInFrame() const;
 };
 
 #endif // MARKERDETECTOR_H

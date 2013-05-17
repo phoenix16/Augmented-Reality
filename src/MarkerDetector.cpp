@@ -45,27 +45,13 @@ void MarkerDetector::findMarkerCorners()
     markerCorners_3D[3] = Point3f(-NormWidth,  NormHeight, 0);
 }
 
-
-
-// Draw an outline around the marker found in the scene
-void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points)
-{
-    cout << "\nDrawing contours around marker in the frame..." << endl;
-      for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
-      {
-        line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
-      }
-    imshow("Marker outline in scene", frame);
-}
-
-
 // Main detection function that performs all steps
-bool MarkerDetector::findMarkerInFrame(Mat& frameColor)
+bool MarkerDetector::findMarkerInFrame(Mat& colorFrame)
 {
     cout << "\nFinding marker in current frame..." << endl;
 
     // Convert frame to grayscale
-    cvtColor(frameColor, frame, CV_BGRA2GRAY);
+    cvtColor(colorFrame, frame, CV_BGRA2GRAY);
 
     vector<KeyPoint> frameKeypoints;
     Mat frameDescriptors;
@@ -110,16 +96,29 @@ bool MarkerDetector::findMarkerInFrame(Mat& frameColor)
     perspectiveTransform(markerCorners_2D, markerCornersInFrame_2D, homography);
 
     // Draw a contour around the marker found in the current frame
-    drawContour(frameColor, markerCornersInFrame_2D);
+    drawContour(colorFrame, markerCornersInFrame_2D);
 
     return (int)matches.size() > minMatchesAllowed;
 }
 
 
-// Main function that allows tracking information to be passed to OpenGL render function
+// Draw an outline around the marker found in the scene
+void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points)
+{
+    cout << "\nDrawing contours around marker in the frame..." << endl;
+      for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
+      {
+        line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
+      }
+    imshow("Marker outline in scene", frame);
+}
+
+
+// Public function to find marker pose (required by OpenGL render function)
 void MarkerDetector::estimatePose(CameraCalibration& CameraCalib)
 {
     cout << "\nEstimating Camera Pose..." << endl;
+	Mat pose(3, 4, CV_32F);
     Mat rVec, tVec;
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
@@ -154,16 +153,10 @@ void MarkerDetector::estimatePose(CameraCalibration& CameraCalib)
     tVecReflected.copyTo(pose.col(3));
 
     cout << "\nPose matrix = " << pose << endl;
-}
 
+}
 
 const Mat& MarkerDetector::getPose() const
 {
-    return pose;
-}
-
-
-const vector<Point2f>& MarkerDetector::getMarkerCornersInFrame() const
-{
-    return markerCornersInFrame_2D;
+  	return pose;
 }
