@@ -48,7 +48,7 @@ private:
   bool markerFound;
   cv::Mat markerPose;
 
-  friend void ARRenderDrawCallback(void* param);
+  friend void OverlayDrawCallback(void* param);
 
   // Render entire scene in the OpenGl window
   void draw();

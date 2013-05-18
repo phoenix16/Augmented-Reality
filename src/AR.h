@@ -9,15 +9,10 @@ class AR
 private:
     MarkerDetector markerObj;
     CameraCalibration cameraCalib;
-	Overlay renderObj; 	// its constructor updates OpenGL draw callback
-
-	bool markerFound;
-    Mat markerPose;	
-
-	bool processFrame(cv::Mat& frame);
+    Overlay renderObj;
 
 public:
-    AR(Mat& marker, std::string windowName, cv::Size windowSize, CameraCalibration& CameraCalib);
+    AR(Mat& marker, std::string windowName, cv::Size windowSize, CameraCalibration& cameraCalib);
 
     void augmentReality(const Mat& cameraFrame);
 };

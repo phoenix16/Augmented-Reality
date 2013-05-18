@@ -18,24 +18,22 @@ private:
     Ptr<FeatureDetector> detector;
     Ptr<DescriptorExtractor> extractor;
     Ptr<DescriptorMatcher> matcher;
-    FlannBasedMatcher FLANNmatcher;
 
-    vector<DMatch> matches;
-    vector<KeyPoint> markerKeypoints;
-    Mat markerDescriptors;
+    vector<KeyPoint> markerKeypoints, frameKeypoints;
+    Mat markerDescriptors, frameDescriptors;
 
     vector<Point2f> markerCorners_2D;
     vector<Point3f> markerCorners_3D;
-	vector<Point2f> markerCornersInFrame_2D;
-	Mat pose;
+    vector<Point2f> markerCornersInFrame_2D;
+
+    Mat pose;
+    void findMarkerCorners();
+    void drawContour(Mat &frame, vector<Point2f>& points, bool markerFound);
 
 public:
     MarkerDetector(Mat &marker);
-    void findMarkerCorners();
-    void drawContour(Mat &frame, vector<Point2f>& points);
     bool findMarkerInFrame(Mat& colorFrame);
-    void estimatePose(CameraCalibration& calibratedCam);
-	const Mat& getPose() const;
+    Mat& estimatePose(CameraCalibration& calibratedCam);
 };
 
 #endif // MARKERDETECTOR_H

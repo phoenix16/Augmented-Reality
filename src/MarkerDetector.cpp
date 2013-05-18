@@ -3,13 +3,7 @@
 MarkerDetector::MarkerDetector(Mat &marker)
     : marker(marker)
 {
-    detector  = new SURF(400);
-    extractor = new SURF();
-    matcher = new FlannBasedMatcher();
-
-    // Extract the descriptors of the marker
-    detector->detect(marker, markerKeypoints);
-    extractor->compute(marker, markerKeypoints, markerDescriptors);
+    cout << "MarkerDetector::constructor " << endl;
 
     // Find corners of marker
     findMarkerCorners();
@@ -50,82 +44,99 @@ bool MarkerDetector::findMarkerInFrame(Mat& colorFrame)
 {
     cout << "\nFinding marker in current frame..." << endl;
 
-    // Convert frame to grayscale
-    cvtColor(colorFrame, frame, CV_BGRA2GRAY);
+    bool markerFound  = false;
 
-    vector<KeyPoint> frameKeypoints;
-    Mat frameDescriptors;
+    // Convert frame to grayscale
+    cvtColor(colorFrame, frame, CV_BGR2GRAY);
+
+    //  detector  = new cv::ORB(1000);
+    //  extractor = new cv::FREAK(false, false);
+    //  matcher   = new cv::BFMatcher(cv::NORM_HAMMING, true);
+
+    detector = new SURF(400);
+    extractor = new SURF();
+    matcher = new FlannBasedMatcher();
+    vector< DMatch > matches;
+
+    detector->detect(marker, markerKeypoints);
+    extractor->compute(marker, markerKeypoints, markerDescriptors);
+
     detector->detect(frame, frameKeypoints);
     extractor->compute(frame, frameKeypoints, frameDescriptors);
 
     cout << "\n\tNumber of Keypoints found in marker = " << markerKeypoints.size() << endl;
     cout << "\n\tNumber of Keypoints found in current frame = " << frameKeypoints.size() << endl;
 
-    // Find matches between current frame and marker
-    matcher->match(markerDescriptors, frameDescriptors, matches);
+    matcher->match( markerDescriptors, frameDescriptors, matches );
 
-    int minMatchesAllowed = 8;
-    if ((int)matches.size() < minMatchesAllowed)
-        return false;
+    cout << "\nNumber of matches = " << matches.size() << endl;
 
-   cout << "\nNumber of matches = " << matches.size() << endl;
+    // Localize the object
+    vector<Point2f> obj;
+    vector<Point2f> scene;
 
-    Mat img_matches;
-    drawMatches(marker, markerKeypoints, frame, frameKeypoints,   // objImage, objKeypts, sceneImage, sceneKeypts
-               matches,
-               img_matches,   // drawn output sits here
-               Scalar::all(-1), Scalar::all(-1), vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-
-    // Find the keypoints of the marker and frame that correspond to the best matches
-    vector<Point2f> objPoints(matches.size());
-    vector<Point2f> scenePoints(matches.size());
-
-    for (size_t i = 0; i < matches.size(); i++)
+    for( size_t i = 0; i < matches.size(); i++ )
     {
-        objPoints[i] = markerKeypoints[matches[i].queryIdx].pt;
-        scenePoints[i] = frameKeypoints[matches[i].trainIdx].pt;
+        // Get the keypoints from the good matches
+        obj.push_back( markerKeypoints[ matches[i].queryIdx ].pt );
+        scene.push_back( frameKeypoints[ matches[i].trainIdx ].pt );
     }
 
     cout << "\nFinding Homography between marker and frame..." << endl;
-    // Find Homography on the best matches
-    Mat homography = findHomography(objPoints, scenePoints, CV_RANSAC);
+
+    // Find Homography on the matches
+    Mat H = findHomography( obj, scene, CV_RANSAC );
 
     cout << "\nApplying Perspective Transform..." << endl;
-    // Apply the perspective transform obtained from homography to transform
-    // the corners of marker image to obtain corners of marker in the frame
-    perspectiveTransform(markerCorners_2D, markerCornersInFrame_2D, homography);
+    // Apply the perspective transform to transform the corners of marker image
+    // into corners of marker in the frame
+    perspectiveTransform( markerCorners_2D, markerCornersInFrame_2D, H);
 
-    // Draw a contour around the marker found in the current frame
-    drawContour(colorFrame, markerCornersInFrame_2D);
+    double area = contourArea(markerCornersInFrame_2D);
+    cout << "\n\t\t\t\t\tArea of contour = " << area << endl;
 
-    return (int)matches.size() > minMatchesAllowed;
+    if ((4000 < area) && (area  < 100000))
+    {
+        markerFound = true;
+    }
+
+    // Draw a contour around the marker if found
+    drawContour(colorFrame, markerCornersInFrame_2D, markerFound);
+
+    cout << "\n\t\t\t\t\tMarker detected ?   " << markerFound << endl;
+
+    return markerFound;
 }
 
 
 // Draw an outline around the marker found in the scene
-void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points)
+void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points, bool markerFound)
 {
     cout << "\nDrawing contours around marker in the frame..." << endl;
-      for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
-      {
-        line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
-      }
+    if (markerFound)
+    {
+        for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
+        {
+            line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
+        }
+    }
     imshow("Marker outline in scene", frame);
+    cvMoveWindow("Marker outline in scene", 800, 250);
 }
 
 
 // Public function to find marker pose (required by OpenGL render function)
-void MarkerDetector::estimatePose(CameraCalibration& CameraCalib)
+Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
 {
     cout << "\nEstimating Camera Pose..." << endl;
-	Mat pose(3, 4, CV_32F);
+    pose.create(3, 4, CV_32F);
     Mat rVec, tVec;
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
     solvePnP(markerCorners_3D,
              markerCornersInFrame_2D,
-             CameraCalib.getIntrinsicMatrix(),
-             CameraCalib.getDistortionMatrix(),
+             cameraCalib.getIntrinsicMatrix(),
+             cameraCalib.getDistortionMatrix(),
              rVec,
              tVec);
 
@@ -148,15 +159,10 @@ void MarkerDetector::estimatePose(CameraCalibration& CameraCalib)
     // Find the reflection of translation vector
     tVecReflected = -tVec;
 
-    pose.create(3, 4, CV_32F);
     rotationInverse.copyTo(pose.colRange(Range(0,3)));
     tVecReflected.copyTo(pose.col(3));
 
     cout << "\nPose matrix = " << pose << endl;
-
+    return pose;
 }
 
-const Mat& MarkerDetector::getPose() const
-{
-  	return pose;
-}
