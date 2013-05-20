@@ -30,6 +30,8 @@ private:
     void findMarkerCorners();
     void drawContour(Mat &frame, vector<Point2f>& points, bool markerFound);
 
+    Point2f findMarkerCentroid(vector<Point2f>& points);
+
 public:
     MarkerDetector(Mat &marker);
     bool findMarkerInFrame(Mat& colorFrame);

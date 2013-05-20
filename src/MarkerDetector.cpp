@@ -125,12 +125,47 @@ void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points, bool marke
 }
 
 
+Point2f MarkerDetector::findMarkerCentroid(vector<Point2f>& points)
+{
+    float A1, B1, C1, A2, B2, C2, det;
+
+    A1 = points[2].y - points[0].y;
+    B1 = points[0].x - points[2].x;
+    C1 = (B1*points[0].y) - (A1*points[0].x);
+
+
+    A2 = points[3].y - points[1].y;
+    B2 = points[1].x - points[3].x;
+    C2 = (B2*points[1].y) - (A2*points[1].x);
+
+    det = (A1*B2) - (A2*B1);
+
+    centroid.x = (B2*C1 – B1*C2) / det;
+    centroid.y = (A1*C2 – A2*C1) / det;
+
+
+    //    A = y2 – y1
+    //    B = x1 – x2
+    //    C = B*y1 + A*x1
+    //        det     = A1B2 – A2B1;
+    //            x = (B2C1 – B1C2) / det
+    //            y = (A1C2 – A2C1) / det
+    return centroid;
+}
+
+
+
 // Public function to find marker pose (required by OpenGL render function)
 Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
 {
     cout << "\nEstimating Camera Pose..." << endl;
     pose.create(3, 4, CV_32F);
     Mat rVec, tVec;
+
+    // Find centroid of detected marker
+    Point2f centroid2D = findMarkerCentroid(markerCornersInFrame_2D);
+    Point2f centroid3D = findMarkerCentroid(markerCorners_3D);
+
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
     solvePnP(markerCorners_3D,
@@ -139,6 +174,15 @@ Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
              cameraCalib.getDistortionMatrix(),
              rVec,
              tVec);
+
+
+    // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
+//    solvePnP(markerCorners_3D,
+//             markerCornersInFrame_2D,
+//             cameraCalib.getIntrinsicMatrix(),
+//             cameraCalib.getDistortionMatrix(),
+//             rVec,
+//             tVec);
 
     rVec.convertTo(rVec,CV_32F);
     tVec.convertTo(tVec ,CV_32F);
