@@ -61,7 +61,7 @@ private:
 
   // Builds the right projection matrix from the camera calibration for AR
   void buildProjectionMatrix(const CameraCalibration& calibration, int w, int h, Mat44& result);
-  
+
   // Draws the coordinate axis 
   void drawCoordinateAxis();
   

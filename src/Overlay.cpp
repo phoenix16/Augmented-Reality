@@ -27,6 +27,7 @@ Overlay::Overlay(std::string windowName, cv::Size windowSize, const CameraCalibr
 
     // Initialize OpenGL draw callback:
     cv::setOpenGlContext(windowName);
+
     cv::setOpenGlDrawCallback(windowName, OverlayDrawCallback, this);
 
 }
@@ -68,15 +69,15 @@ void Overlay::updateWindow()
 
 // Private function
 void Overlay::draw()
-{
+{    
     cout << "Overlay::draw()" << endl;
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // Clear entire screen:
-    drawCameraFrame();                                  // Render background
+    drawCameraFrame();                                  // Render background texture = current frame
     drawAugmentedScene();                               // Draw AR
     glFlush();
 }
 
-// Private function
+// Private function to set the current frame as the texture of the background
 void Overlay::drawCameraFrame()
 {
     cout << "Overlay::drawCameraFrame" << endl;
@@ -156,6 +157,7 @@ void Overlay::drawAugmentedScene()
         // Set the pattern transformation
         Mat44 glMatrix;
 
+
         // Convert markerPose from a 3x3 Mat to Mat44
         // pose4x4 = pose3x3   [0]3x1
         //	         [0]1x3     1
@@ -167,11 +169,13 @@ void Overlay::drawAugmentedScene()
             for (int col=0; col<3; col++)
                 glMatrix.mat[row][col] = markerPose.at<float>(row, col);
 
+        // Load the Model View matrix with marker's current pose matrix
         glLoadMatrixf(reinterpret_cast<const GLfloat*>(&glMatrix.data[0]));
 
         // Render model
 //        drawCoordinateAxis();
         drawCubeModel();
+
     }
 
     cout << "Overlay::drawAugmentedScene END" << endl;
@@ -182,9 +186,7 @@ void Overlay::buildProjectionMatrix(const CameraCalibration& calibration, int sc
 {
     cout << "Overlay::buildProjectionMatrix" << endl;
     float nearPlane = 0.01f;  // Near clipping distance
-//    float farPlane  = 100.0f;  // Far clipping distance
-
-    float farPlane  = 10.0f;  // Far clipping distance
+    float farPlane  = 100.0f;  // Far clipping distance
 
     // Camera parameters
     float f_x = calibration.getfx(); // Focal length in x axis
@@ -218,6 +220,8 @@ void Overlay::buildProjectionMatrix(const CameraCalibration& calibration, int sc
 void Overlay::drawCoordinateAxis()
 {
     cout << "Overlay::drawCoordinateAxis" << endl;
+      glTranslatef(0.0f, 0.0f, -10.0f);  //Move forward 10 units in Z direction
+
     static float lineX[] = {0,0,0,1,0,0};
     static float lineY[] = {0,0,0,0,1,0};
     static float lineZ[] = {0,0,0,0,0,1};
@@ -245,111 +249,198 @@ void Overlay::drawCoordinateAxis()
 void Overlay::drawCubeModel()
 {
     cout << "Overlay::drawCubeModel" << endl;
-    static const GLfloat LightAmbient[]=  { 0.25f, 0.25f, 0.25f, 1.0f };    // Ambient Light Values
-    static const GLfloat LightDiffuse[]=  { 0.1f, 0.1f, 0.1f, 1.0f };    // Diffuse Light Values
-    static const GLfloat LightPosition[]= { 0.0f, 0.0f, 2.0f, 1.0f };    // Light Position
+    float angle = 45;
+    const float BOX_SIZE = 10.0f; //The length of each side of the cube
 
-    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT | GL_ENABLE_BIT | GL_LIGHTING_BIT | GL_POLYGON_BIT);
+    glTranslatef(0.0f, 0.0f, 10.0f);  //Move forward 10 units in Z direction ?
+    // If not, cube fills up the whole frame
 
-    glColor4f(0.2f,0.35f,0.3f,0.75f);         // Full Brightness, 50% Alpha ( NEW )
-    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);       // Blending Function For Translucency Based On Source Alpha
-    glEnable(GL_BLEND);
+    GLfloat ambientLight[] = {0.3f, 0.3f, 0.3f, 1.0f};
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientLight);
 
-    glShadeModel(GL_SMOOTH);
+    GLfloat lightColor[] = {0.7f, 0.7f, 0.7f, 1.0f};
+    GLfloat lightPos[] = {-2 * BOX_SIZE, BOX_SIZE, 4 * BOX_SIZE, 1.0f};
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
-    glEnable(GL_LIGHTING);
-    glDisable(GL_LIGHT0);
-    glEnable(GL_LIGHT1);
-    glLightfv(GL_LIGHT1, GL_AMBIENT, LightAmbient);
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, LightDiffuse);
-    glLightfv(GL_LIGHT1, GL_POSITION, LightPosition);
-    glEnable(GL_COLOR_MATERIAL);
+    glRotatef(-angle, 1.0f, 1.0f, 0.0f);
 
+    glBegin(GL_QUADS);
+
+    //Top face
+    glColor3f(1.0f, 1.0f, 0.0f);
+    glNormal3f(0.0, 1.0f, 0.0f);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+
+    //Bottom face
+    glColor3f(1.0f, 0.0f, 1.0f);
+    glNormal3f(0.0, -1.0f, 0.0f);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+
+    //Left face
+    glNormal3f(-1.0, 0.0f, 0.0f);
+    glColor3f(0.0f, 1.0f, 1.0f);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+
+    //Right face
+    glNormal3f(1.0, 0.0f, 0.0f);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+
+    //Front face
+    glNormal3f(0.0, 0.0f, 1.0f);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, BOX_SIZE / 2);
+
+    //Back face
+    glNormal3f(0.0, 0.0f, -1.0f);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(-BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(-BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, BOX_SIZE / 2, -BOX_SIZE / 2);
+    glVertex3f(BOX_SIZE / 2, -BOX_SIZE / 2, -BOX_SIZE / 2);
+
+    glEnd();
+//    glDisable(GL_TEXTURE_2D);
+
+//    glutSwapBuffers();
+
+
+//    static const GLfloat LightAmbient[]=  { 0.25f, 0.25f, 0.25f, 1.0f };    // Ambient Light Values
+//    static const GLfloat LightDiffuse[]=  { 0.1f, 0.1f, 0.1f, 1.0f };    // Diffuse Light Values
+//    static const GLfloat LightPosition[]= { 0.0f, 0.0f, 2.0f, 1.0f };    // Light Position
+
+//    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT | GL_ENABLE_BIT | GL_LIGHTING_BIT | GL_POLYGON_BIT);
+
+//    glColor4f(0.2f,0.35f,0.3f,0.75f);         // Full Brightness, 50% Alpha
+//    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);       // Blending Function For Translucency Based On Source Alpha
+//    glEnable(GL_BLEND);
+
+//    glShadeModel(GL_SMOOTH);
+
+//    glEnable(GL_LIGHTING);
+//    glDisable(GL_LIGHT0);
+//    glEnable(GL_LIGHT1);
+//    glLightfv(GL_LIGHT1, GL_AMBIENT, LightAmbient);
+//    glLightfv(GL_LIGHT1, GL_DIFFUSE, LightDiffuse);
+//    glLightfv(GL_LIGHT1, GL_POSITION, LightPosition);
+//    glEnable(GL_COLOR_MATERIAL);
+
+    // original
 //    glScalef(0.25, 0.25, 0.25);
-    glTranslatef(0, 0, 0.1);
+//    glTranslatef(0, 0, 1);
 
-    glScalef(0.01, 0.01, 0.01);
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);;
+//    glRotatef(-angle, 1.0f, 1.0f, 0.0f);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glBegin(GL_QUADS);
-    // Front Face
-    glNormal3f( 0.0f, 0.0f, 1.0f);    // Normal Pointing Towards Viewer
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 1 (Front)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 2 (Front)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Front)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 4 (Front)
-    // Back Face
-    glNormal3f( 0.0f, 0.0f,-1.0f);    // Normal Pointing Away From Viewer
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Back)
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 2 (Back)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 3 (Back)
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 4 (Back)
-    // Top Face
-    glNormal3f( 0.0f, 1.0f, 0.0f);    // Normal Pointing Up
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 1 (Top)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 2 (Top)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Top)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 4 (Top)
-    // Bottom Face
-    glNormal3f( 0.0f,-1.0f, 0.0f);    // Normal Pointing Down
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Bottom)
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 2 (Bottom)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 3 (Bottom)
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 4 (Bottom)
-    // Right face
-    glNormal3f( 1.0f, 0.0f, 0.0f);    // Normal Pointing Right
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 1 (Right)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 2 (Right)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Right)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 4 (Right)
-    // Left Face
-    glNormal3f(-1.0f, 0.0f, 0.0f);    // Normal Pointing Left
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Left)
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 2 (Left)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 3 (Left)
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 4 (Left)
-    glEnd();
+//    glBegin(GL_QUADS);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glColor4f(0.2f,0.65f,0.3f,0.35f); // Full Brightness, 50% Alpha ( NEW )
-    glBegin(GL_QUADS);
-    // Front Face
-    glNormal3f( 0.0f, 0.0f, 1.0f);    // Normal Pointing Towards Viewer
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 1 (Front)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 2 (Front)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Front)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 4 (Front)
-    // Back Face
-    glNormal3f( 0.0f, 0.0f,-1.0f);    // Normal Pointing Away From Viewer
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Back)
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 2 (Back)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 3 (Back)
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 4 (Back)
-    // Top Face
-    glNormal3f( 0.0f, 1.0f, 0.0f);    // Normal Pointing Up
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 1 (Top)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 2 (Top)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Top)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 4 (Top)
-    // Bottom Face
-    glNormal3f( 0.0f,-1.0f, 0.0f);    // Normal Pointing Down
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Bottom)
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 2 (Bottom)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 3 (Bottom)
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 4 (Bottom)
-    // Right face
-    glNormal3f( 1.0f, 0.0f, 0.0f);    // Normal Pointing Right
-    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 1 (Right)
-    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 2 (Right)
-    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Right)
-    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 4 (Right)
-    // Left Face
-    glNormal3f(-1.0f, 0.0f, 0.0f);    // Normal Pointing Left
-    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Left)
-    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 2 (Left)
-    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 3 (Left)
-    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 4 (Left)
-    glEnd();
+//    // Front Face
+//    glNormal3f( 0.0f, 0.0f, 1.0f);    // Normal Pointing Towards Viewer
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 1 (Front)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 2 (Front)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Front)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 4 (Front)
 
-    glPopAttrib();
+//    // Back Face
+//    glNormal3f( 0.0f, 0.0f,-1.0f);    // Normal Pointing Away From Viewer
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Back)
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 2 (Back)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 3 (Back)
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 4 (Back)
+
+//    // Top Face
+//    glNormal3f( 0.0f, 1.0f, 0.0f);    // Normal Pointing Up
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 1 (Top)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 2 (Top)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Top)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 4 (Top)
+
+//    // Bottom Face
+//    glNormal3f( 0.0f,-1.0f, 0.0f);    // Normal Pointing Down
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Bottom)
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 2 (Bottom)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 3 (Bottom)
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 4 (Bottom)
+
+//    // Right face
+//    glNormal3f( 1.0f, 0.0f, 0.0f);    // Normal Pointing Right
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 1 (Right)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 2 (Right)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Right)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 4 (Right)
+
+//    // Left Face
+//    glNormal3f(-1.0f, 0.0f, 0.0f);    // Normal Pointing Left
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Left)
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 2 (Left)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 3 (Left)
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 4 (Left)
+//    glEnd();
+
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//    glColor4f(0.2f,0.65f,0.3f,0.35f); // Full Brightness, 50% Alpha
+
+//    glBegin(GL_QUADS);
+//    // Front Face
+//    glNormal3f( 0.0f, 0.0f, 1.0f);    // Normal Pointing Towards Viewer
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 1 (Front)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 2 (Front)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Front)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 4 (Front)
+
+//    // Back Face
+//    glNormal3f( 0.0f, 0.0f,-1.0f);    // Normal Pointing Away From Viewer
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Back)
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 2 (Back)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 3 (Back)
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 4 (Back)
+
+//    // Top Face
+//    glNormal3f( 0.0f, 1.0f, 0.0f);    // Normal Pointing Up
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 1 (Top)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 2 (Top)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Top)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 4 (Top)
+
+//    // Bottom Face
+//    glNormal3f( 0.0f,-1.0f, 0.0f);    // Normal Pointing Down
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Bottom)
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 2 (Bottom)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 3 (Bottom)
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 4 (Bottom)
+
+//    // Right face
+//    glNormal3f( 1.0f, 0.0f, 0.0f);    // Normal Pointing Right
+//    glVertex3f( 1.0f, -1.0f, -1.0f);  // Point 1 (Right)
+//    glVertex3f( 1.0f,  1.0f, -1.0f);  // Point 2 (Right)
+//    glVertex3f( 1.0f,  1.0f,  1.0f);  // Point 3 (Right)
+//    glVertex3f( 1.0f, -1.0f,  1.0f);  // Point 4 (Right)
+
+//    // Left Face
+//    glNormal3f(-1.0f, 0.0f, 0.0f);    // Normal Pointing Left
+//    glVertex3f(-1.0f, -1.0f, -1.0f);  // Point 1 (Left)
+//    glVertex3f(-1.0f, -1.0f,  1.0f);  // Point 2 (Left)
+//    glVertex3f(-1.0f,  1.0f,  1.0f);  // Point 3 (Left)
+//    glVertex3f(-1.0f,  1.0f, -1.0f);  // Point 4 (Left)
+//    glEnd();
+
+//    glPopAttrib();
 }
