@@ -53,6 +53,8 @@ private:
   // Render entire scene in the OpenGl window
   void draw();
 
+//  void keyboard(unsigned char key, int x, int y);
+
   // Draws the background with video
   void drawCameraFrame();
 

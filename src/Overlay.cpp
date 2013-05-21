@@ -139,7 +139,6 @@ void Overlay::drawCameraFrame()
 // This function acts on the marker pose set by an external function
 void Overlay::drawAugmentedScene()
 {
-    cout << "Overlay::drawAugmentedScene" << endl;
     // Init augmentation projection
     Mat44 projectionMatrix;
     int w = m_backgroundImage.cols;
@@ -156,7 +155,6 @@ void Overlay::drawAugmentedScene()
     {
         // Set the pattern transformation
         Mat44 glMatrix;
-
 
         // Convert markerPose from a 3x3 Mat to Mat44
         // pose4x4 = pose3x3   [0]3x1
@@ -185,8 +183,11 @@ void Overlay::drawAugmentedScene()
 void Overlay::buildProjectionMatrix(const CameraCalibration& calibration, int screen_width, int screen_height, Mat44& projectionMatrix)
 {
     cout << "Overlay::buildProjectionMatrix" << endl;
-    float nearPlane = 0.01f;  // Near clipping distance
-    float farPlane  = 100.0f;  // Far clipping distance
+//    float nearPlane = 0.01f;  // Near clipping distance
+//    float farPlane  = 100.0f;  // Far clipping distance
+
+    float nearPlane = 0.1f;  // Near clipping distance
+    float farPlane  = 1000.0f;  // Far clipping distance
 
     // Camera parameters
     float f_x = calibration.getfx(); // Focal length in x axis
@@ -220,7 +221,7 @@ void Overlay::buildProjectionMatrix(const CameraCalibration& calibration, int sc
 void Overlay::drawCoordinateAxis()
 {
     cout << "Overlay::drawCoordinateAxis" << endl;
-      glTranslatef(0.0f, 0.0f, -10.0f);  //Move forward 10 units in Z direction
+      glTranslatef(0.0f, 0.0f, 10.0f);  //Move forward 10 units in Z direction
 
     static float lineX[] = {0,0,0,1,0,0};
     static float lineY[] = {0,0,0,0,1,0};
@@ -245,15 +246,14 @@ void Overlay::drawCoordinateAxis()
     glEnd();
 }
 
+
 // Private function
 void Overlay::drawCubeModel()
 {
-    cout << "Overlay::drawCubeModel" << endl;
     float angle = 45;
-    const float BOX_SIZE = 10.0f; //The length of each side of the cube
+    const float BOX_SIZE = 1.0f; //The length of each side of the cube
 
-    glTranslatef(0.0f, 0.0f, 10.0f);  //Move forward 10 units in Z direction ?
-    // If not, cube fills up the whole frame
+    glTranslatef(0.0f, 10.0f, -8.0f);  // camera on boxes
 
     GLfloat ambientLight[] = {0.3f, 0.3f, 0.3f, 1.0f};
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientLight);
@@ -444,3 +444,7 @@ void Overlay::drawCubeModel()
 
 //    glPopAttrib();
 }
+
+
+
+

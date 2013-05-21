@@ -3,8 +3,16 @@
 MarkerDetector::MarkerDetector(Mat &marker)
     : marker(marker)
 {
-    cout << "MarkerDetector::constructor " << endl;
+	detector = new SURF(400);
+    extractor = new SURF();
+    matcher = new FlannBasedMatcher();     
+	
+	//  detector  = new cv::ORB(1000);
+    //  extractor = new cv::FREAK(false, false);
+    //  matcher   = new cv::BFMatcher(cv::NORM_HAMMING, true);
 
+    detector->detect(marker, markerKeypoints);
+    extractor->compute(marker, markerKeypoints, markerDescriptors);
     // Find corners of marker
     findMarkerCorners();
 }
@@ -21,10 +29,10 @@ void MarkerDetector::findMarkerCorners()
     markerCorners_3D.resize(4);
 
     // Find the 2D corners of marker
-    markerCorners_2D[0] = Point2f(0, 0);
-    markerCorners_2D[1] = Point2f(width, 0);
-    markerCorners_2D[2] = Point2f(width, height);
-    markerCorners_2D[3] = Point2f(0, height);
+    markerCorners_2D[0] = cv::Point2f(0, 0);
+    markerCorners_2D[1] = cv::Point2f(width, 0);
+    markerCorners_2D[2] = cv::Point2f(width, height);
+    markerCorners_2D[3] = cv::Point2f(0, height);
 
     // Normalized dimensions
     float maxDim = max(width,height);
@@ -33,10 +41,10 @@ void MarkerDetector::findMarkerCorners()
 
     // Find 3D corners of marker to estimate camera pose later
     // 3D corners of marker lie on XY plane as its planar, so z coordinate = 0
-    markerCorners_3D[0] = Point3f(-NormWidth, -NormHeight, 0);
-    markerCorners_3D[1] = Point3f( NormWidth, -NormHeight, 0);
-    markerCorners_3D[2] = Point3f( NormWidth,  NormHeight, 0);
-    markerCorners_3D[3] = Point3f(-NormWidth,  NormHeight, 0);
+    markerCorners_3D[0] = cv::Point3f(-NormWidth, -NormHeight, 0);
+    markerCorners_3D[1] = cv::Point3f( NormWidth, -NormHeight, 0);
+    markerCorners_3D[2] = cv::Point3f( NormWidth,  NormHeight, 0);
+    markerCorners_3D[3] = cv::Point3f(-NormWidth,  NormHeight, 0);
 }
 
 // Main detection function that performs all steps
@@ -48,36 +56,23 @@ bool MarkerDetector::findMarkerInFrame(Mat& colorFrame)
 
     // Convert frame to grayscale
     cvtColor(colorFrame, frame, CV_BGR2GRAY);
-
-    //  detector  = new cv::ORB(1000);
-    //  extractor = new cv::FREAK(false, false);
-    //  matcher   = new cv::BFMatcher(cv::NORM_HAMMING, true);
-
-    detector = new SURF(400);
-    extractor = new SURF();
-    matcher = new FlannBasedMatcher();
-    vector< DMatch > matches;
-
-    detector->detect(marker, markerKeypoints);
-    extractor->compute(marker, markerKeypoints, markerDescriptors);
-
+	
+	vector< DMatch > matches;
     detector->detect(frame, frameKeypoints);
     extractor->compute(frame, frameKeypoints, frameDescriptors);
 
     cout << "\n\tNumber of Keypoints found in marker = " << markerKeypoints.size() << endl;
     cout << "\n\tNumber of Keypoints found in current frame = " << frameKeypoints.size() << endl;
 
-    matcher->match( markerDescriptors, frameDescriptors, matches );
-
+    matcher->match(markerDescriptors, frameDescriptors, matches);
     cout << "\nNumber of matches = " << matches.size() << endl;
 
     // Localize the object
-    vector<Point2f> obj;
-    vector<Point2f> scene;
+    vector<cv::Point2f> obj;
+    vector<cv::Point2f> scene;
 
     for( size_t i = 0; i < matches.size(); i++ )
-    {
-        // Get the keypoints from the good matches
+    {   // Get the keypoints from the matches
         obj.push_back( markerKeypoints[ matches[i].queryIdx ].pt );
         scene.push_back( frameKeypoints[ matches[i].trainIdx ].pt );
     }
@@ -85,14 +80,14 @@ bool MarkerDetector::findMarkerInFrame(Mat& colorFrame)
     cout << "\nFinding Homography between marker and frame..." << endl;
 
     // Find Homography on the matches
-    Mat H = findHomography( obj, scene, CV_RANSAC );
+    Mat H = cv::findHomography( obj, scene, CV_RANSAC );
 
     cout << "\nApplying Perspective Transform..." << endl;
     // Apply the perspective transform to transform the corners of marker image
     // into corners of marker in the frame
-    perspectiveTransform( markerCorners_2D, markerCornersInFrame_2D, H);
+    cv::perspectiveTransform( markerCorners_2D, markerCornersInFrame_2D, H);
 
-    double area = contourArea(markerCornersInFrame_2D);
+    double area = cv::contourArea(markerCornersInFrame_2D);
     cout << "\n\t\t\t\t\tArea of contour = " << area << endl;
 
     if ((4000 < area) && (area  < 100000))
@@ -110,50 +105,58 @@ bool MarkerDetector::findMarkerInFrame(Mat& colorFrame)
 
 
 // Draw an outline around the marker found in the scene
-void MarkerDetector::drawContour(Mat &frame, vector<Point2f>& points, bool markerFound)
+void MarkerDetector::drawContour(Mat &frame, vector<cv::Point2f>& points, bool markerFound)
 {
     cout << "\nDrawing contours around marker in the frame..." << endl;
     if (markerFound)
     {
         for (size_t i = 0; i < markerCornersInFrame_2D.size(); i++)
         {
-            line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
+            cv::line(frame, points[i], points[ (i+1) % points.size() ], Scalar(255, 0, 0), 4);
         }
     }
-    imshow("Marker outline in scene", frame);
-    cvMoveWindow("Marker outline in scene", 800, 250);
+    cv::imshow("Marker outline in scene", frame);
+	cv::moveWindow("Marker outline in scene", 800, 250);
 }
 
 
-Point2f MarkerDetector::findMarkerCentroid(vector<Point2f>& points)
-{
-    float A1, B1, C1, A2, B2, C2, det;
-
-    A1 = points[2].y - points[0].y;
-    B1 = points[0].x - points[2].x;
-    C1 = (B1*points[0].y) - (A1*points[0].x);
-
-
-    A2 = points[3].y - points[1].y;
-    B2 = points[1].x - points[3].x;
-    C2 = (B2*points[1].y) - (A2*points[1].x);
-
-    det = (A1*B2) - (A2*B1);
-
-    centroid.x = (B2*C1 – B1*C2) / det;
-    centroid.y = (A1*C2 – A2*C1) / det;
-
-
-    //    A = y2 – y1
+void MarkerDetector::findMarkerCentroids()
+{	//    A = y2 – y1
     //    B = x1 – x2
     //    C = B*y1 + A*x1
     //        det     = A1B2 – A2B1;
     //            x = (B2C1 – B1C2) / det
     //            y = (A1C2 – A2C1) / det
-    return centroid;
+
+    float A1, B1, C1, A2, B2, C2, det;
+
+	// Find the 2D coordinates of the centroid of the estimated marker (output of perspective transform)
+    A1 = markerCornersInFrame_2D[2].y - markerCornersInFrame_2D[0].y;
+    B1 = markerCornersInFrame_2D[0].x - markerCornersInFrame_2D[2].x;
+    C1 = (B1*markerCornersInFrame_2D[0].y) - (A1*markerCornersInFrame_2D[0].x);
+
+    A2 = markerCornersInFrame_2D[3].y - markerCornersInFrame_2D[1].y;
+    B2 = markerCornersInFrame_2D[1].x - markerCornersInFrame_2D[3].x;
+    C2 = (B2*markerCornersInFrame_2D[1].y) - (A2*markerCornersInFrame_2D[1].x);
+
+    det = (A1*B2) - (A2*B1);
+    centroid2D.x = (B2*C1) - (B1*C2) / det;
+    centroid2D.y = (A1*C2) - (A2*C1) / det;
+
+	// Find the 3D coordinates of the centroid of the source marker
+	A1 = markerCorners_3D[2].y - markerCorners_3D[0].y;
+    B1 = markerCorners_3D[0].x - markerCorners_3D[2].x;
+    C1 = (B1*markerCorners_3D[0].y) - (A1*markerCorners_3D[0].x);
+
+    A2 = markerCorners_3D[3].y - markerCorners_3D[1].y;
+    B2 = markerCorners_3D[1].x - markerCorners_3D[3].x;
+    C2 = (B2*markerCorners_3D[1].y) - (A2*markerCorners_3D[1].x);
+
+    det = (A1*B2) - (A2*B1);
+    centroid3D.x = (B2*C1) - (B1*C2) / det;
+    centroid3D.y = (A1*C2) - (A2*C1) / det;
+	centroid3D.z = 0; // because this point lies on XY plane
 }
-
-
 
 // Public function to find marker pose (required by OpenGL render function)
 Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
@@ -162,19 +165,22 @@ Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
     pose.create(3, 4, CV_32F);
     Mat rVec, tVec;
 
-    // Find centroid of detected marker
-    Point2f centroid2D = findMarkerCentroid(markerCornersInFrame_2D);
-    Point2f centroid3D = findMarkerCentroid(markerCorners_3D);
+    // Find centroids of detected marker and the source marker in 3D
+    findMarkerCentroids();
 
+	// Create a vector for each centroid (because solvePnP function only accepts an array of points)
+	vector<cv::Point2f> centroid2D_vec;
+	vector<cv::Point3f> centroid3D_vec;  
+	centroid2D_vec.push_back(centroid2D);
+	centroid3D_vec.push_back(centroid3D);
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
-    solvePnP(markerCorners_3D,
-             markerCornersInFrame_2D,
+    solvePnP(centroid3D_vec,
+             centroid2D_vec,
              cameraCalib.getIntrinsicMatrix(),
              cameraCalib.getDistortionMatrix(),
              rVec,
              tVec);
-
 
     // solvePnP finds camera location w.r.t to marker pose from 3D-2D point correspondences
 //    solvePnP(markerCorners_3D,
@@ -210,3 +216,8 @@ Mat& MarkerDetector::estimatePose(CameraCalibration& cameraCalib)
     return pose;
 }
 
+// Public Setter function
+//const Mat& MarkerDetector::getMarkerPose() const 
+//{
+//	return pose;
+//}
