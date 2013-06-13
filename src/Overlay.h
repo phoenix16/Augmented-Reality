@@ -53,8 +53,6 @@ private:
   // Render entire scene in the OpenGl window
   void draw();
 
-//  void keyboard(unsigned char key, int x, int y);
-
   // Draws the background with video
   void drawCameraFrame();
 
@@ -69,6 +67,8 @@ private:
   
   // Draw the cube model
   void drawCubeModel();
+
+  void drawTeapot();
 
 };
 

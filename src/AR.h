@@ -8,8 +8,8 @@ class AR
 {
 private:
     MarkerDetector markerObj;
-    CameraCalibration cameraCalib;
-    Overlay renderObj;
+    CameraCalibration cameraCalibObj;
+    Overlay overlayObj;
 
 public:
     AR(Mat& marker, std::string windowName, cv::Size windowSize, CameraCalibration& cameraCalib);

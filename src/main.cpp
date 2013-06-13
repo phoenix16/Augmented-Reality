@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     // Load marker image in grayscale
 //    Mat marker = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE );
 
-    Mat marker = imread("marker.jpg", CV_LOAD_IMAGE_GRAYSCALE );
+    Mat marker = imread("spaceship.jpg", CV_LOAD_IMAGE_GRAYSCALE );
 
     if( !marker.data)
     { cerr << "Error reading marker image! " << endl; return -1; }
