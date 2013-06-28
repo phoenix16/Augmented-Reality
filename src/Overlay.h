@@ -1,5 +1,9 @@
-#ifndef ARRENDER_H
-#define ARRENDER_H
+/*
+ * Developer : Prakriti Chintalapoodi - c.prakriti@gmail.com 
+*/
+
+#ifndef OVERLAY_H
+#define OVERLAY_H
 
 #include <opencv2/highgui/highgui.hpp>
 #include "CameraCalibration.h"
@@ -21,7 +25,7 @@ union Mat44
 };
 
 // Friend function that updates draw callback
-void ARRenderDrawCallback(void* param);
+void OverlayDrawCallback(void* param);
 
 class Overlay
 {
@@ -61,9 +65,6 @@ private:
 
   // Builds the right projection matrix from the camera calibration for AR
   void buildProjectionMatrix(const CameraCalibration& calibration, int w, int h, Mat44& result);
-
-  // Draws the coordinate axis 
-  void drawCoordinateAxis();
   
   // Draw the cube model
   void drawCubeModel();
@@ -74,4 +75,4 @@ private:
 
 
 
-#endif // ARRENDER_H
+#endif // OVERLAY_H

@@ -1,3 +1,7 @@
+/*
+ * Developer : Prakriti Chintalapoodi - c.prakriti@gmail.com 
+*/
+
 #ifndef MARKERDETECTOR_H
 #define MARKERDETECTOR_H
 

@@ -1,3 +1,7 @@
+/*
+ * Developer : Prakriti Chintalapoodi - c.prakriti@gmail.com 
+*/
+
 #include "AR.h"
 
 AR::AR(Mat& marker, std::string windowName, cv::Size windowSize, CameraCalibration& cameraCalib)
@@ -10,8 +14,6 @@ AR::AR(Mat& marker, std::string windowName, cv::Size windowSize, CameraCalibrati
 // Public function the performs the entire AR pipeline
 void AR::augmentReality(const Mat& cameraFrame)
 {
-    cout << "============================ NEW FRAME ============================== " << endl;
-
     // Clone image used for background (to draw 3D object overlay on it)
     cv::Mat frame = cameraFrame.clone();
 

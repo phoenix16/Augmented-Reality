@@ -1,3 +1,7 @@
+/*
+ * Developer : Prakriti Chintalapoodi - c.prakriti@gmail.com 
+*/
+
 #include "MarkerDetector.h"
 
 MarkerDetector::MarkerDetector(Mat &marker)
@@ -7,10 +11,6 @@ MarkerDetector::MarkerDetector(Mat &marker)
     extractor = new SURF();
     matcher = new FlannBasedMatcher();     
 	
-	//  detector  = new cv::ORB(1000);
-    //  extractor = new cv::FREAK(false, false);
-    //  matcher   = new cv::BFMatcher(cv::NORM_HAMMING, true);
-
     detector->detect(marker, markerKeypoints);
     extractor->compute(marker, markerKeypoints, markerDescriptors);
 
